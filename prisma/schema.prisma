@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String     @id @default(cuid())
+  email                 String     @unique
+  username              String     @unique
+  displayName           String
+  password              String
+  profilePhoto          String?
+  coverImage            String?
+  bio                   String?
+  isVerified            Boolean    @default(false)
+  onlineStatus          Boolean    @default(false)
+  lastSeen              DateTime   @default(now())
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  
+  privacySettings       PrivacySettings?
+  
+  sentMessages          Message[]     @relation("sender")
+  receivedMessages      Message[]     @relation("receiver")
+  conversations         Conversation[] @relation("participants")
+  chats                 Chat[]        @relation("members")
+  groups                Group[]       @relation("members")
+  groupAdmins           Group[]       @relation("admins")
+  createdChannels       Channel[]
+  channelSubscriptions  Channel[]     @relation("subscribers")
+  statuses              Status[]
+  blocks                UserBlock[]   @relation("blocker")
+  blockedBy             UserBlock[]   @relation("blocked")
+  readReceipts          ReadReceipt[]
+  typingIndicators      TypingIndicator[]
+  
+  twitter               String?
+  instagram             String?
+  linkedin              String?
+  website               String?
+}
+
+model PrivacySettings {
+  id                    String     @id @default(cuid())
+  userId                String     @unique
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  lastSeenVisible       Boolean    @default(true)
+  onlineStatusVisible   Boolean    @default(true)
+  profileVisible        Boolean    @default(true)
+  readReceiptsEnabled   Boolean    @default(true)
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model UserBlock {
+  id                    String     @id @default(cuid())
+  blockerId             String
+  blocker               User       @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId             String
+  blocked               User       @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime   @default(now())
+  
+  @@unique([blockerId, blockedId])
+}
+
+model Conversation {
+  id                    String     @id @default(cuid())
+  participantIds        String[]
+  participants          User[]     @relation("participants")
+  messages              Message[]
+  lastMessageAt         DateTime   @default(now())
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model Message {
+  id                    String     @id @default(cuid())
+  conversationId        String
+  conversation          Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderId              String
+  sender                User       @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  receiverId            String?
+  receiver              User?      @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  content               String?
+  mediaUrls             String[]
+  voiceNoteUrl          String?
+  documentUrl           String?
+  documentName          String?
+  
+  isEdited              Boolean    @default(false)
+  editedAt              DateTime?
+  isDeleted             Boolean    @default(false)
+  
+  reactions             Reaction[]
+  readReceipts          ReadReceipt[]
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model Reaction {
+  id                    String     @id @default(cuid())
+  messageId             String
+  message               Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  emoji                 String
+  userId                String
+  
+  createdAt             DateTime   @default(now())
+  
+  @@unique([messageId, emoji, userId])
+}
+
+model ReadReceipt {
+  id                    String     @id @default(cuid())
+  messageId             String
+  message               Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  readAt                DateTime   @default(now())
+  
+  @@unique([messageId, userId])
+}
+
+model TypingIndicator {
+  id                    String     @id @default(cuid())
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId        String
+  
+  createdAt             DateTime   @default(now())
+  expiresAt             DateTime
+}
+
+model Status {
+  id                    String     @id @default(cuid())
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  content               String
+  mediaUrl              String?
+  musicUrl              String?
+  
+  viewedBy              String[]
+  
+  createdAt             DateTime   @default(now())
+  expiresAt             DateTime   @default(db.now() + interval '24 hours')
+}
+
+model Channel {
+  id                    String     @id @default(cuid())
+  name                  String     @unique
+  description           String?
+  icon                  String?
+  creatorId             String
+  creator               User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  isVerified            Boolean    @default(false)
+  category              String?
+  
+  subscribers           User[]     @relation("subscribers")
+  messages              ChannelMessage[]
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model ChannelMessage {
+  id                    String     @id @default(cuid())
+  channelId             String
+  channel               Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  senderId              String
+  
+  content               String
+  mediaUrls             String[]
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model Chat {
+  id                    String     @id @default(cuid())
+  name                  String
+  description           String?
+  icon                  String?
+  
+  memberIds             String[]
+  members               User[]     @relation("members")
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model Group {
+  id                    String     @id @default(cuid())
+  name                  String
+  description           String?
+  icon                  String?
+  
+  memberIds             String[]
+  members               User[]     @relation("members")
+  
+  adminIds              String[]
+  admins                User[]     @relation("admins")
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model Notification {
+  id                    String     @id @default(cuid())
+  userId                String
+  
+  type                  String
+  title                 String
+  message               String
+  actionUrl             String?
+  
+  isRead                Boolean    @default(false)
+  
+  createdAt             DateTime   @default(now())
+  expiresAt             DateTime   @default(db.now() + interval '7 days')
+}
